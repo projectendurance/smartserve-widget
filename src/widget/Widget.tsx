@@ -3,6 +3,7 @@ import { chatSend } from "./api";
 
 type Props = { venueId: string; embedKey: string; apiBase: string };
 type Msg = { role: "user" | "assistant"; text: string };
+const MAX_MESSAGE_LEN = 2000;
 
 function getSessionId() {
   const k = "ss_widget_session_id";
@@ -29,8 +30,21 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
   );
 
   async function onSend() {
+    if (busy) return;
+
+    if (typeof input !== "string") return;
+
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text) return;
+
+    if (text.length > MAX_MESSAGE_LEN) {
+      setMsgs((m) => [
+        ...m,
+        { role: "assistant", text: "Message too long. Please shorten it." },
+      ]);
+      return;
+    }
+
 
     setInput("");
     setMsgs((m) => [...m, { role: "user", text }]);
@@ -133,7 +147,11 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onSend();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onSend();
+                }
+
               }}
               placeholder={busy ? "Sending..." : "Type a message…"}
               style={{
