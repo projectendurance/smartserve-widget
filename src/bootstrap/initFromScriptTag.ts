@@ -1,10 +1,22 @@
-// src/bootstrap/initFromScriptTag.ts
 import { init } from "./init";
 
-export function initFromScriptTag() {
-  const script = document.currentScript as HTMLScriptElement | null;
+function findOurScript(): HTMLScriptElement | null {
+  // Prefer currentScript if available (works during initial execution)
+  const cs = document.currentScript as HTMLScriptElement | null;
+  if (cs) return cs;
 
-  // Read config from the <script> tag that loaded the widget
+  // Fallback: find the script element by its src
+  const scripts = Array.from(document.getElementsByTagName("script"));
+  return (
+    scripts.find((s) => (s.src || "").includes("cdn.smartserveai.uk/widget.js")) ||
+    scripts.find((s) => (s.src || "").includes("/widget.js")) ||
+    null
+  );
+}
+
+export function initFromScriptTag() {
+  const script = findOurScript();
+
   const venue =
     script?.getAttribute("data-ss-venue") ||
     script?.dataset?.ssVenue ||
@@ -20,13 +32,19 @@ export function initFromScriptTag() {
     script?.dataset?.ssApiBase ||
     "https://api.smartserveai.uk";
 
-  if (!venue || !embedKey) {
-    console.error(
-      "SmartServeWidget: missing data-ss-venue or data-ss-embed-key on script tag."
-    );
+  if (!script) {
+    console.error("[SmartServeWidget] Could not find widget <script> tag on page.");
     return;
   }
 
-  // Pass through to your app bootstrap (store/use these in state/config)
+  if (!venue || !embedKey) {
+    console.error("[SmartServeWidget] Missing data-ss-venue or data-ss-embed-key on script tag.", {
+      venue,
+      embedKeyPresent: !!embedKey,
+      apiBase,
+    });
+    return;
+  }
+
   init({ venue, key: embedKey, apiBase });
 }
