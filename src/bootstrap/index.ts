@@ -1,4 +1,6 @@
-import { init, type InitOpts } from "./init";
+import { init } from "./init";
+import { initFromScriptTag } from "./initFromScriptTag";
+import type { InitOpts } from "./init";
 
 declare global {
   interface Window {
@@ -8,7 +10,10 @@ declare global {
   }
 }
 
-// no-op placeholder until initFromScriptTag runs
+// Auto-init when loaded via <script>
+initFromScriptTag();
+
+// Optional manual API (keeps flexibility)
 window.SmartServeWidget = {
   init(opts: InitOpts) {
     init(opts);
