@@ -1,15 +1,60 @@
-import { useMemo, useState } from "react";
-
+import { useMemo, useRef, useState } from "react";
+import { chatSend } from "./api";
 
 type Props = { venueId: string; embedKey: string; apiBase: string };
+type Msg = { role: "user" | "assistant"; text: string };
+
+function getSessionId() {
+  const k = "ss_widget_session_id";
+  const existing = sessionStorage.getItem(k);
+  if (existing) return existing;
+  const v = crypto.randomUUID();
+  sessionStorage.setItem(k, v);
+  return v;
+}
 
 export default function Widget({ venueId, embedKey, apiBase }: Props) {
   const [open, setOpen] = useState(false);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msgs, setMsgs] = useState<Msg[]>([
+    { role: "assistant", text: "Hi — how can I help?" },
+  ]);
+
+  const sessionIdRef = useRef<string>(getSessionId());
 
   const title = useMemo(
     () => `venue=${venueId} key=${embedKey.slice(0, 8)}… api=${apiBase}`,
     [venueId, embedKey, apiBase]
   );
+
+  async function onSend() {
+    const text = input.trim();
+    if (!text || busy) return;
+
+    setInput("");
+    setMsgs((m) => [...m, { role: "user", text }]);
+    setBusy(true);
+
+    try {
+      const res = await chatSend(apiBase, venueId, embedKey, {
+        message: text,
+        session_id: sessionIdRef.current,
+      });
+
+      setMsgs((m) => [...m, { role: "assistant", text: res.text }]);
+    } catch (e: any) {
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "assistant",
+          text: `Error sending message. ${e?.message || ""}`.trim(),
+        },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 2147483647 }}>
@@ -55,16 +100,70 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
             </button>
           </div>
 
-          <div style={{ padding: 12, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial", fontSize: 13 }}>
-            <div style={{ opacity: 0.7, marginBottom: 8 }}>Widget config:</div>
-            <div><b>Venue:</b> {venueId}</div>
-            <div><b>API:</b> {apiBase}</div>
-            <div style={{ opacity: 0.7, marginTop: 10 }}>
-              Next step: wire chat send to your llama endpoint using these headers.
-            </div>
+          <div style={{ padding: 12, overflowY: "auto", flex: 1 }}>
+            {msgs.map((m, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+                  marginBottom: 8,
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "85%",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    background: m.role === "user" ? "#111" : "#f2f2f2",
+                    color: m.role === "user" ? "white" : "black",
+                    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+                    fontSize: 13,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {m.text}
+                </div>
+              </div>
+            ))}
           </div>
 
-          <div style={{ marginTop: "auto", padding: 12, borderTop: "1px solid #eee", opacity: 0.7, fontSize: 12 }}>
+          <div style={{ padding: 10, borderTop: "1px solid #eee", display: "flex", gap: 8 }}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSend();
+              }}
+              placeholder={busy ? "Sending..." : "Type a message…"}
+              style={{
+                flex: 1,
+                padding: "10px 10px",
+                borderRadius: 10,
+                border: "1px solid #ddd",
+                fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+                fontSize: 13,
+              }}
+              disabled={busy}
+            />
+            <button
+              onClick={onSend}
+              disabled={busy}
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid rgba(0,0,0,0.15)",
+                background: busy ? "#f5f5f5" : "white",
+                cursor: busy ? "not-allowed" : "pointer",
+                fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+              }}
+              title={title}
+            >
+              Send
+            </button>
+          </div>
+
+          <div style={{ padding: 8, borderTop: "1px solid #eee", fontSize: 11, opacity: 0.65 }}>
             {title}
           </div>
         </div>
