@@ -9,9 +9,9 @@ type Props = {
   apiBase: string;        // chat service base
   bookingApiBase: string; // booking-api base
 
-  // keep paths configurable until you confirm exact booking-api routes
-  availabilityPath?: string;   // default "/api/availability"
-  createBookingPath?: string;  // default "/api/bookings"
+  // configurable booking-api routes
+  availabilityPath?: string;   // default "/api/check_availability"
+  createBookingPath?: string;  // default "/api/create_booking"
 };
 
 type Msg = { role: "user" | "assistant"; text: string };
@@ -42,9 +42,7 @@ export default function Widget({
   ]);
 
   const [bookingOpen, setBookingOpen] = useState(false);
-  const [bookingPrefill, setBookingPrefill] = useState<BookingPrefill | null>(
-    null
-  );
+  const [bookingPrefill, setBookingPrefill] = useState<BookingPrefill | null>(null);
 
   function openBookingForm(prefill?: BookingPrefill) {
     setBookingPrefill(prefill ?? null);
@@ -60,7 +58,6 @@ export default function Widget({
 
   async function onSend() {
     if (busy) return;
-
     if (typeof input !== "string") return;
 
     const text = input.trim();
@@ -79,12 +76,12 @@ export default function Widget({
     setBusy(true);
 
     try {
+      // chatSend returns { raw, text }
       const res = await chatSend(apiBase, venueId, embedKey, {
         message: text,
         session_id: sessionIdRef.current,
       });
 
-      // IMPORTANT: your chatSend returns { raw, text }
       const raw = (res as any)?.raw as ChatResponse;
       const reply = String((res as any)?.text ?? "").trim();
 
@@ -122,7 +119,7 @@ export default function Widget({
             marginBottom: 10,
             display: "flex",
             flexDirection: "column",
-            position: "relative", // needed so BookingModal absolute overlay anchors to this panel
+            position: "relative", // BookingModal overlay anchor
           }}
         >
           <div
@@ -188,15 +185,15 @@ export default function Widget({
             venueId={venueId}
             embedKey={embedKey}
             bookingApiBase={bookingApiBase}
-            availabilityPath={"/api/check_availability"}
-            createBookingPath={"/api/create_booking"}
+            availabilityPath={availabilityPath ?? "/api/check_availability"}
+            createBookingPath={createBookingPath ?? "/api/create_booking"}
             prefill={bookingPrefill}
             onBooked={(result) => {
-              const code = result.confirmation_code || "N/A";
-              const manage = result.manage_url ? `\nManage: ${result.manage_url}` : "";
+              const code = result?.confirmation_code || "N/A";
+              const manage = result?.manage_url ? `\nManage: ${result.manage_url}` : "";
 
-              // Stripe deposits later: handle requires_payment in the same spot
-              if (result.status === "requires_payment" && result.checkout_url) {
+              // Stripe deposits later
+              if (result?.status === "requires_payment" && result?.checkout_url) {
                 setMsgs((m) => [
                   ...m,
                   {
@@ -214,14 +211,7 @@ export default function Widget({
             }}
           />
 
-          <div
-            style={{
-              padding: 10,
-              borderTop: "1px solid #eee",
-              display: "flex",
-              gap: 8,
-            }}
-          >
+          <div style={{ padding: 10, borderTop: "1px solid #eee", display: "flex", gap: 8 }}>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -259,14 +249,7 @@ export default function Widget({
             </button>
           </div>
 
-          <div
-            style={{
-              padding: 8,
-              borderTop: "1px solid #eee",
-              fontSize: 11,
-              opacity: 0.65,
-            }}
-          >
+          <div style={{ padding: 8, borderTop: "1px solid #eee", fontSize: 11, opacity: 0.65 }}>
             {title}
           </div>
         </div>
