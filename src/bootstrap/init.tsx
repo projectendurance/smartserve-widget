@@ -34,6 +34,7 @@ export function init(opts: InitOpts) {
         venueId={opts.venue}
         embedKey={opts.key}
         apiBase={opts.apiBase}
+        bookingApiBase={opts.apiBase}
       />
     </React.StrictMode>
   );
