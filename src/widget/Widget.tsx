@@ -1,7 +1,19 @@
 import { useMemo, useRef, useState } from "react";
 import { chatSend } from "./api";
+import BookingModal from "../components/BookingModal";
+import type { BookingPrefill, ChatResponse } from "../lib/types";
 
-type Props = { venueId: string; embedKey: string; apiBase: string };
+type Props = {
+  venueId: string;
+  embedKey: string;
+  apiBase: string;        // chat service base
+  bookingApiBase: string; // booking-api base
+
+  // keep paths configurable until you confirm exact booking-api routes
+  availabilityPath?: string;   // default "/api/availability"
+  createBookingPath?: string;  // default "/api/bookings"
+};
+
 type Msg = { role: "user" | "assistant"; text: string };
 const MAX_MESSAGE_LEN = 2000;
 
@@ -14,13 +26,30 @@ function getSessionId() {
   return v;
 }
 
-export default function Widget({ venueId, embedKey, apiBase }: Props) {
+export default function Widget({
+  venueId,
+  embedKey,
+  apiBase,
+  bookingApiBase,
+  availabilityPath,
+  createBookingPath,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
     { role: "assistant", text: "Hi — how can I help?" },
   ]);
+
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingPrefill, setBookingPrefill] = useState<BookingPrefill | null>(
+    null
+  );
+
+  function openBookingForm(prefill?: BookingPrefill) {
+    setBookingPrefill(prefill ?? null);
+    setBookingOpen(true);
+  }
 
   const sessionIdRef = useRef<string>(getSessionId());
 
@@ -45,7 +74,6 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
       return;
     }
 
-
     setInput("");
     setMsgs((m) => [...m, { role: "user", text }]);
     setBusy(true);
@@ -56,7 +84,17 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
         session_id: sessionIdRef.current,
       });
 
-      setMsgs((m) => [...m, { role: "assistant", text: res.text }]);
+      // IMPORTANT: your chatSend returns { raw, text }
+      const raw = (res as any)?.raw as ChatResponse;
+      const reply = String((res as any)?.text ?? "").trim();
+
+      if (reply) {
+        setMsgs((m) => [...m, { role: "assistant", text: reply }]);
+      }
+
+      if (raw?.action?.type === "OPEN_BOOKING_FORM") {
+        openBookingForm(raw.action.prefill);
+      }
     } catch (e: any) {
       setMsgs((m) => [
         ...m,
@@ -84,6 +122,7 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
             marginBottom: 10,
             display: "flex",
             flexDirection: "column",
+            position: "relative", // needed so BookingModal absolute overlay anchors to this panel
           }}
         >
           <div
@@ -142,7 +181,47 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
             ))}
           </div>
 
-          <div style={{ padding: 10, borderTop: "1px solid #eee", display: "flex", gap: 8 }}>
+          {/* ===== Booking Modal (server-driven) ===== */}
+          <BookingModal
+            open={bookingOpen}
+            onClose={() => setBookingOpen(false)}
+            venueId={venueId}
+            embedKey={embedKey}
+            bookingApiBase={bookingApiBase}
+            availabilityPath={"/api/check_availability"}
+            createBookingPath={"/api/create_booking"}
+            prefill={bookingPrefill}
+            onBooked={(result) => {
+              const code = result.confirmation_code || "N/A";
+              const manage = result.manage_url ? `\nManage: ${result.manage_url}` : "";
+
+              // Stripe deposits later: handle requires_payment in the same spot
+              if (result.status === "requires_payment" && result.checkout_url) {
+                setMsgs((m) => [
+                  ...m,
+                  {
+                    role: "assistant",
+                    text: `Deposit required to confirm.\nPay here: ${result.checkout_url}`,
+                  },
+                ]);
+                return;
+              }
+
+              setMsgs((m) => [
+                ...m,
+                { role: "assistant", text: `Booked. Confirmation code: ${code}.${manage}` },
+              ]);
+            }}
+          />
+
+          <div
+            style={{
+              padding: 10,
+              borderTop: "1px solid #eee",
+              display: "flex",
+              gap: 8,
+            }}
+          >
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -151,7 +230,6 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
                   e.preventDefault();
                   onSend();
                 }
-
               }}
               placeholder={busy ? "Sending..." : "Type a message…"}
               style={{
@@ -181,7 +259,14 @@ export default function Widget({ venueId, embedKey, apiBase }: Props) {
             </button>
           </div>
 
-          <div style={{ padding: 8, borderTop: "1px solid #eee", fontSize: 11, opacity: 0.65 }}>
+          <div
+            style={{
+              padding: 8,
+              borderTop: "1px solid #eee",
+              fontSize: 11,
+              opacity: 0.65,
+            }}
+          >
             {title}
           </div>
         </div>
