@@ -33,9 +33,10 @@ export function init(opts: InitOpts) {
       <Widget
         venueId={opts.venue}
         embedKey={opts.key}
-        apiBase={opts.apiBase}
-        bookingApiBase={opts.apiBase}
+        apiBase={opts.apiBase}                     // chat service
+        bookingApiBase="https://api.smartserveai.uk" // booking API
       />
+
     </React.StrictMode>
   );
 }
