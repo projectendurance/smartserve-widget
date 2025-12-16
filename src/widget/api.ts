@@ -13,7 +13,7 @@ export async function chatSend(
   embedKey: string,
   payload: ChatSendPayload
 ): Promise<{ raw: ChatResponse; text: string }> {
-  const r = await fetch(`${apiBase}/api/chat/send`, {
+  const r = await fetch(`${apiBase}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
