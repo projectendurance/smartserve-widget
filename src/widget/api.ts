@@ -10,20 +10,23 @@ export type ChatSendPayload = {
 export async function chatSend(
   apiBase: string,
   venueId: string,
-  embedKey: string,
+  _embedKey: string, // intentionally unused for chat
   payload: ChatSendPayload
 ): Promise<{ raw: ChatResponse; text: string }> {
   const r = await fetch(`${apiBase}/api/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // keep your existing enterprise headers
-      "X-SS-Venue": venueId,
-      "X-SS-Embed-Key": embedKey,
+
+      // ✅ REQUIRED for LLaMA auth
+      "x-api-key": import.meta.env.VITE_CHAT_API_KEY,
+
+      // ✅ REQUIRED for multi-venue isolation
+      "x-venue-id": venueId,
     },
     body: JSON.stringify({
       ...payload,
-      venue_id: venueId, // harmless if duplicated; server can ignore
+      venue_id: venueId, // safe duplicate, server ignores if redundant
     }),
     cache: "no-store",
   });
@@ -46,7 +49,6 @@ export async function chatSend(
     throw new Error(String(msg));
   }
 
-  // Normalise assistant-facing text WITHOUT destroying raw response
   const assistantText =
     data?.reply ??
     data?.answer ??
