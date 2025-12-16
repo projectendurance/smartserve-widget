@@ -44,8 +44,8 @@ export async function checkAvailability(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Venue-Id": venueId,
-      "X-Embed-Key": embedKey,
+      "X-SS-Venue-Id": venueId,
+      "X-SS-Embed-Key": embedKey,
     },
     body: JSON.stringify(payload),
     cache: "no-store",
@@ -83,8 +83,8 @@ export async function createBooking(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Venue-Id": venueId,
-      "X-Embed-Key": embedKey,
+      "X-SS-Venue-Id": venueId,
+      "X-SS-Embed-Key": embedKey,
     },
     body: JSON.stringify({ ...payload, time_24h }),
     cache: "no-store",
