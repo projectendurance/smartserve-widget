@@ -76,7 +76,6 @@ export default function Widget({
     setBusy(true);
 
     try {
-      // chatSend returns { raw, text }
       const res = await chatSend(apiBase, venueId, embedKey, {
         message: text,
         session_id: sessionIdRef.current,
@@ -119,9 +118,10 @@ export default function Widget({
             marginBottom: 10,
             display: "flex",
             flexDirection: "column",
-            position: "relative", // BookingModal overlay anchor
+            position: "relative",
           }}
         >
+          {/* Header */}
           <div
             style={{
               padding: "10px 12px",
@@ -150,6 +150,7 @@ export default function Widget({
             </button>
           </div>
 
+          {/* Messages */}
           <div style={{ padding: 12, overflowY: "auto", flex: 1 }}>
             {msgs.map((m, i) => (
               <div
@@ -178,6 +179,21 @@ export default function Widget({
             ))}
           </div>
 
+          {/* ===== Safety disclaimer ===== */}
+          <div
+            style={{
+              padding: "8px 12px",
+              borderTop: "1px solid #eee",
+              fontSize: 11,
+              lineHeight: 1.35,
+              opacity: 0.75,
+              fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+            }}
+          >
+            Allergy / intolerance note: dish descriptions may change. For allergen or ingredient-safety
+            information, please contact the restaurant directly.
+          </div>
+
           {/* ===== Booking Modal (server-driven) ===== */}
           <BookingModal
             open={bookingOpen}
@@ -192,7 +208,6 @@ export default function Widget({
               const code = result?.confirmation_code || "N/A";
               const manage = result?.manage_url ? `\nManage: ${result.manage_url}` : "";
 
-              // Stripe deposits later
               if (result?.status === "requires_payment" && result?.checkout_url) {
                 setMsgs((m) => [
                   ...m,
@@ -211,6 +226,7 @@ export default function Widget({
             }}
           />
 
+          {/* Input */}
           <div style={{ padding: 10, borderTop: "1px solid #eee", display: "flex", gap: 8 }}>
             <input
               value={input}
