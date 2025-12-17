@@ -1,6 +1,6 @@
 // src/components/BookingModal.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AvailabilityResponse,
   BookingPrefill,
@@ -17,7 +17,6 @@ type Props = {
 
   bookingApiBase: string;
 
-  // Configure these once; don’t hardcode endpoints all over the repo
   availabilityPath: string;   // e.g. "/api/availability"
   createBookingPath: string;  // e.g. "/api/bookings"
 
@@ -56,8 +55,25 @@ export default function BookingModal({
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
   const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
+
+  const firstFieldRef = useRef<HTMLInputElement | null>(null);
+
+  // Theme tokens (from index.css)
+  const css = {
+    void: "var(--ss-void, #040307)",
+    navy1: "var(--ss-navy-1, #000010)",
+    navy2: "var(--ss-navy-2, #000818)",
+    text: "var(--ss-text, rgba(255,255,255,0.92))",
+    muted: "var(--ss-muted, rgba(255,255,255,0.65))",
+    border: "var(--ss-border, rgba(255,255,255,0.10))",
+    orange: "var(--ss-orange, #F84400)",
+    orange2: "var(--ss-orange-2, #F85800)",
+    orangeSoft: "var(--ss-orange-soft, rgba(248,68,0,0.25))",
+    orangeRing: "var(--ss-orange-ring, rgba(248,68,0,0.38))",
+    font:
+      "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial",
+  };
 
   // Apply prefill whenever it changes (server-driven)
   useEffect(() => {
@@ -75,16 +91,29 @@ export default function BookingModal({
     setAvailability(null);
   }, [prefill, open]);
 
-  // If modal opens with no prefill, don’t wipe existing user input unless you want that.
-  // This preserves what user typed if they closed/reopened.
   useEffect(() => {
     if (!open) {
       setErr(null);
       setAvailability(null);
       setBusy(false);
       setChecking(false);
+      return;
     }
+
+    // focus first field on open (professional polish)
+    const t = setTimeout(() => firstFieldRef.current?.focus(), 80);
+    return () => clearTimeout(t);
   }, [open]);
+
+  // basic esc close
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   const missing = useMemo(() => {
     const out: string[] = [];
@@ -163,217 +192,388 @@ export default function BookingModal({
 
   if (!open) return null;
 
+  const panelBg = `
+    radial-gradient(900px 520px at 50% 0%, rgba(248,68,0,0.10), transparent 58%),
+    radial-gradient(700px 520px at 50% 90%, rgba(0,8,24,0.95), transparent 60%),
+    linear-gradient(180deg, ${css.navy1}, ${css.void})
+  `;
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12,
+    color: css.muted,
+    letterSpacing: 0.2,
+    fontFamily: css.font,
+    marginBottom: 6,
+    display: "block",
+  };
+
+  const inputBase: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 14,
+    background: "rgba(0,0,0,0.22)",
+    color: css.text,
+    outline: "none",
+    fontFamily: css.font,
+    fontSize: 13,
+    border: "1px solid rgba(255,255,255,0.12)",
+    transition: "box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease",
+  };
+
+  // Professional focus ring (thin orange, not tacky)
+  const focusHandlers = {
+    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.currentTarget.style.borderColor = String(css.orangeRing);
+      e.currentTarget.style.boxShadow = `0 0 0 3px ${css.orangeSoft}`;
+      e.currentTarget.style.filter = "brightness(1.03)";
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.currentTarget.style.boxShadow = "none";
+      e.currentTarget.style.filter = "none";
+    },
+  } as const;
+
+  // Date/Time icon overlay (clean, subtle)
+  const iconWrap: React.CSSProperties = {
+    position: "relative",
+  };
+
+  const iconStyle: React.CSSProperties = {
+    position: "absolute",
+    right: 10,
+    top: "50%",
+    transform: "translateY(-50%)",
+    width: 18,
+    height: 18,
+    opacity: 0.75,
+    pointerEvents: "none",
+  };
+
+  const padRightForIcon: React.CSSProperties = {
+    paddingRight: 36,
+  };
+
+  const fieldBorder = (key: string) =>
+    missing.includes(key)
+      ? `1px solid ${css.orangeRing}`
+      : "1px solid rgba(255,255,255,0.12)";
+
+  const IconCalendar = () => (
+    <svg viewBox="0 0 24 24" style={iconStyle} fill="none">
+      <path
+        d="M7 2v3M17 2v3M3.5 9.5h17"
+        stroke={css.orange}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+      <path
+        d="M6 5h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z"
+        stroke="rgba(255,255,255,0.55)"
+        strokeWidth="1.6"
+        opacity="0.9"
+      />
+      <path
+        d="M7.5 13h3M7.5 16.5h3M13.5 13h3M13.5 16.5h3"
+        stroke="rgba(255,255,255,0.45)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        opacity="0.9"
+      />
+    </svg>
+  );
+
+  const IconClock = () => (
+    <svg viewBox="0 0 24 24" style={iconStyle} fill="none">
+      <path
+        d="M12 7v5l3 2"
+        stroke={css.orange}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.9"
+      />
+      <path
+        d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
+        stroke="rgba(255,255,255,0.55)"
+        strokeWidth="1.6"
+        opacity="0.9"
+      />
+    </svg>
+  );
+
   return (
     <div
       style={{
         position: "absolute",
         inset: 0,
-        background: "rgba(0,0,0,0.35)",
+        background: "rgba(0,0,0,0.45)",
         display: "flex",
         alignItems: "flex-end",
         justifyContent: "center",
         padding: 10,
       }}
       onMouseDown={(e) => {
-        // close if click outside panel
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
         style={{
           width: "100%",
-          maxWidth: 360,
-          background: "white",
-          borderRadius: 12,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-          padding: 12,
-          fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial",
+          maxWidth: 390,
+          borderRadius: 20,
+          overflow: "hidden",
+          border: `1px solid ${css.border}`,
+          boxShadow: "0 30px 90px rgba(0,0,0,0.75)",
+          background: panelBg,
+          backdropFilter: "blur(10px)",
+          fontFamily: css.font,
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-          <strong>Book a table</strong>
+        {/* Header */}
+        <div
+          style={{
+            padding: "12px 14px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottom: `1px solid ${css.border}`,
+            background: "rgba(0,0,0,0.18)",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div
+              style={{
+                color: css.text,
+                fontWeight: 900,
+                fontSize: 14,
+                letterSpacing: 0.2,
+              }}
+            >
+              Book a table
+            </div>
+            <div style={{ color: css.muted, fontSize: 11 }}>
+              Fill the details below to confirm.
+            </div>
+          </div>
+
           <button
             onClick={onClose}
-            style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 16 }}
             aria-label="Close booking form"
             title="Close"
+            style={{
+              border: `1px solid ${css.border}`,
+              background: "rgba(255,255,255,0.04)",
+              color: css.text,
+              width: 34,
+              height: 34,
+              borderRadius: 12,
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+            }}
           >
             ×
           </button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <label style={{ fontSize: 12 }}>
-            Date
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: missing.includes("date") ? "1px solid #b00020" : "1px solid #ddd",
-                marginTop: 4,
-              }}
-            />
-          </label>
+        {/* Body */}
+        <div style={{ padding: 14 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+            }}
+          >
+            <div>
+              <label style={labelStyle}>Date</label>
+              <div style={iconWrap}>
+                <input
+                  ref={firstFieldRef}
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  style={{ ...inputBase, ...padRightForIcon, border: fieldBorder("date") }}
+                  {...focusHandlers}
+                />
+                <IconCalendar />
+              </div>
+            </div>
 
-          <label style={{ fontSize: 12 }}>
-            Time
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: missing.includes("time") ? "1px solid #b00020" : "1px solid #ddd",
-                marginTop: 4,
-              }}
-            />
-          </label>
+            <div>
+              <label style={labelStyle}>Time</label>
+              <div style={iconWrap}>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  style={{ ...inputBase, ...padRightForIcon, border: fieldBorder("time") }}
+                  {...focusHandlers}
+                />
+                <IconClock />
+              </div>
+            </div>
 
-          <label style={{ fontSize: 12 }}>
-            Party size
-            <input
-              type="number"
-              min={1}
-              value={partySize}
-              onChange={(e) => setPartySize(Number(e.target.value))}
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: missing.includes("party size") ? "1px solid #b00020" : "1px solid #ddd",
-                marginTop: 4,
-              }}
-            />
-          </label>
+            <div>
+              <label style={labelStyle}>Party size</label>
+              <input
+                type="number"
+                min={1}
+                value={partySize}
+                onChange={(e) => setPartySize(Number(e.target.value))}
+                style={{ ...inputBase, border: fieldBorder("party size") }}
+                {...focusHandlers}
+              />
+            </div>
 
-          <label style={{ fontSize: 12 }}>
-            Name
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: missing.includes("name") ? "1px solid #b00020" : "1px solid #ddd",
-                marginTop: 4,
-              }}
-            />
-          </label>
+            <div>
+              <label style={labelStyle}>Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                style={{ ...inputBase, border: fieldBorder("name") }}
+                {...focusHandlers}
+              />
+            </div>
 
-          <label style={{ fontSize: 12, gridColumn: "1 / -1" }}>
-            Contact (optional)
-            <input
-              type="text"
-              value={contact}
-              onChange={(e) => setContact(e.target.value)}
-              placeholder="Email or phone"
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-                marginTop: 4,
-              }}
-            />
-          </label>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Contact (optional)</label>
+              <input
+                type="text"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder="Email or phone"
+                style={{ ...inputBase, border: "1px solid rgba(255,255,255,0.12)" }}
+                {...focusHandlers}
+              />
+            </div>
 
-          <label style={{ fontSize: 12, gridColumn: "1 / -1" }}>
-            Special requests (optional)
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Allergies, seating, etc."
-              style={{
-                width: "100%",
-                padding: 8,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-                marginTop: 4,
-                resize: "none",
-              }}
-            />
-          </label>
-        </div>
-
-        {err && (
-          <div style={{ marginTop: 10, fontSize: 12, color: "#b00020" }}>
-            {err}
-          </div>
-        )}
-
-        {availability?.slots?.length ? (
-          <div style={{ marginTop: 10, fontSize: 12 }}>
-            <div style={{ marginBottom: 6, opacity: 0.8 }}>Availability:</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {availability.slots
-                .filter((s) => s.available)
-                .slice(0, 10)
-                .map((s) => (
-                  <button
-                    key={s.time_24h}
-                    onClick={() => setTime(s.time_24h)}
-                    style={{
-                      padding: "6px 8px",
-                      borderRadius: 999,
-                      border: "1px solid #ddd",
-                      background: "white",
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                    title="Use this time"
-                  >
-                    {s.time_24h}
-                  </button>
-                ))}
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Special requests (optional)</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="Allergies, seating, etc."
+                style={{
+                  ...inputBase,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  resize: "none",
+                }}
+                {...focusHandlers}
+              />
             </div>
           </div>
-        ) : null}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button
-            onClick={onCheckAvailability}
-            disabled={checking || busy}
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid #ddd",
-              background: "white",
-              cursor: checking || busy ? "not-allowed" : "pointer",
-            }}
-          >
-            {checking ? "Checking..." : "Check"}
-          </button>
+          {/* Error */}
+          {err && (
+            <div
+              style={{
+                marginTop: 10,
+                padding: "10px 12px",
+                borderRadius: 14,
+                border: "1px solid rgba(248,68,0,0.35)",
+                background: "rgba(248,68,0,0.10)",
+                color: css.text,
+                fontSize: 12,
+              }}
+            >
+              {err}
+            </div>
+          )}
 
-          <button
-            onClick={onConfirm}
-            disabled={busy}
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(0,0,0,0.15)",
-              background: busy ? "#f5f5f5" : "#111",
-              color: busy ? "#111" : "white",
-              cursor: busy ? "not-allowed" : "pointer",
-            }}
-          >
-            {busy ? "Booking..." : "Confirm"}
-          </button>
-        </div>
+          {/* Availability */}
+          {availability?.slots?.length ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: css.muted, marginBottom: 8 }}>
+                Suggested times
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {availability.slots
+                  .filter((s) => s.available)
+                  .slice(0, 10)
+                  .map((s) => {
+                    const active = s.time_24h === time;
+                    return (
+                      <button
+                        key={s.time_24h}
+                        onClick={() => setTime(s.time_24h)}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: 999,
+                          border: active
+                            ? "1px solid rgba(248,68,0,0.55)"
+                            : "1px solid rgba(255,255,255,0.12)",
+                          background: active
+                            ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
+                            : "rgba(255,255,255,0.06)",
+                          color: css.text,
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontFamily: css.font,
+                        }}
+                        title="Use this time"
+                      >
+                        {s.time_24h}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          ) : null}
 
-        <div style={{ marginTop: 10, fontSize: 11, opacity: 0.65 }}>
-          This creates a real booking for venue: <code>{venueId}</code>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button
+              onClick={onCheckAvailability}
+              disabled={checking || busy}
+              style={{
+                flex: 1,
+                padding: "11px 12px",
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.06)",
+                color: css.text,
+                cursor: checking || busy ? "not-allowed" : "pointer",
+                fontWeight: 800,
+                fontFamily: css.font,
+              }}
+            >
+              {checking ? "Checking..." : "Check"}
+            </button>
+
+            <button
+              onClick={onConfirm}
+              disabled={busy}
+              style={{
+                flex: 1,
+                padding: "11px 12px",
+                borderRadius: 14,
+                border: "0",
+                background: busy
+                  ? "rgba(255,255,255,0.08)"
+                  : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
+                color: busy ? css.muted : "#0b0b0b",
+                cursor: busy ? "not-allowed" : "pointer",
+                fontWeight: 900,
+                fontFamily: css.font,
+                boxShadow: busy ? "none" : "0 16px 35px rgba(248,68,0,0.22)",
+              }}
+            >
+              {busy ? "Booking..." : "Confirm"}
+            </button>
+          </div>
+
+          {/* Footer note */}
+          <div style={{ marginTop: 12, fontSize: 11, color: css.muted }}>
+            This creates a real booking for venue:{" "}
+            <code style={{ color: css.text }}>{venueId}</code>
+          </div>
         </div>
       </div>
     </div>
