@@ -17,8 +17,8 @@ type Props = {
 
   bookingApiBase: string;
 
-  availabilityPath: string;   // e.g. "/api/availability"
-  createBookingPath: string;  // e.g. "/api/bookings"
+  availabilityPath: string; // e.g. "/api/availability"
+  createBookingPath: string; // e.g. "/api/bookings"
 
   prefill: BookingPrefill | null;
 
@@ -55,15 +55,14 @@ export default function BookingModal({
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [availability, setAvailability] = useState<AvailabilityResponse | null>(null);
+  const [availability, setAvailability] =
+    useState<AvailabilityResponse | null>(null);
 
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
-  // Theme tokens (from index.css)
   const css = {
     void: "var(--ss-void, #040307)",
     navy1: "var(--ss-navy-1, #000010)",
-    navy2: "var(--ss-navy-2, #000818)",
     text: "var(--ss-text, rgba(255,255,255,0.92))",
     muted: "var(--ss-muted, rgba(255,255,255,0.65))",
     border: "var(--ss-border, rgba(255,255,255,0.10))",
@@ -99,13 +98,10 @@ export default function BookingModal({
       setChecking(false);
       return;
     }
-
-    // focus first field on open (professional polish)
     const t = setTimeout(() => firstFieldRef.current?.focus(), 80);
     return () => clearTimeout(t);
   }, [open]);
 
-  // basic esc close
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -207,20 +203,35 @@ export default function BookingModal({
     display: "block",
   };
 
+  // KEY FIXES FOR YOUR SPACING / MISALIGNMENT:
+  // - boxSizing: border-box so padding doesn't cause weird widths
+  // - height consistent to stop date/time being taller/shorter than others
+  // - remove overlay icons (they are what visually mess the date/time fields in many browsers)
   const inputBase: React.CSSProperties = {
     width: "100%",
-    padding: "10px 12px",
-    borderRadius: 14,
+    boxSizing: "border-box",
+    height: 40,
+    padding: "9px 10px",
+    borderRadius: 12,
     background: "rgba(0,0,0,0.22)",
     color: css.text,
     outline: "none",
     fontFamily: css.font,
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: "16px",
     border: "1px solid rgba(255,255,255,0.12)",
     transition: "box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease",
   };
 
-  // Professional focus ring (thin orange, not tacky)
+  const textareaBase: React.CSSProperties = {
+    ...inputBase,
+    height: "auto",
+    minHeight: 64,
+    paddingTop: 10,
+    paddingBottom: 10,
+    resize: "none",
+  };
+
   const focusHandlers = {
     onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       e.currentTarget.style.borderColor = String(css.orangeRing);
@@ -233,74 +244,10 @@ export default function BookingModal({
     },
   } as const;
 
-  // Date/Time icon overlay (clean, subtle)
-  const iconWrap: React.CSSProperties = {
-    position: "relative",
-  };
-
-  const iconStyle: React.CSSProperties = {
-    position: "absolute",
-    right: 10,
-    top: "50%",
-    transform: "translateY(-50%)",
-    width: 18,
-    height: 18,
-    opacity: 0.75,
-    pointerEvents: "none",
-  };
-
-  const padRightForIcon: React.CSSProperties = {
-    paddingRight: 36,
-  };
-
   const fieldBorder = (key: string) =>
     missing.includes(key)
       ? `1px solid ${css.orangeRing}`
       : "1px solid rgba(255,255,255,0.12)";
-
-  const IconCalendar = () => (
-    <svg viewBox="0 0 24 24" style={iconStyle} fill="none">
-      <path
-        d="M7 2v3M17 2v3M3.5 9.5h17"
-        stroke={css.orange}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        opacity="0.9"
-      />
-      <path
-        d="M6 5h12a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z"
-        stroke="rgba(255,255,255,0.55)"
-        strokeWidth="1.6"
-        opacity="0.9"
-      />
-      <path
-        d="M7.5 13h3M7.5 16.5h3M13.5 13h3M13.5 16.5h3"
-        stroke="rgba(255,255,255,0.45)"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        opacity="0.9"
-      />
-    </svg>
-  );
-
-  const IconClock = () => (
-    <svg viewBox="0 0 24 24" style={iconStyle} fill="none">
-      <path
-        d="M12 7v5l3 2"
-        stroke={css.orange}
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.9"
-      />
-      <path
-        d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"
-        stroke="rgba(255,255,255,0.55)"
-        strokeWidth="1.6"
-        opacity="0.9"
-      />
-    </svg>
-  );
 
   return (
     <div
@@ -322,14 +269,17 @@ export default function BookingModal({
         aria-modal="true"
         style={{
           width: "100%",
-          maxWidth: 390,
-          borderRadius: 20,
+          maxWidth: 360,
+          maxHeight: 440,
+          borderRadius: 18,
           overflow: "hidden",
           border: `1px solid ${css.border}`,
           boxShadow: "0 30px 90px rgba(0,0,0,0.75)",
           background: panelBg,
           backdropFilter: "blur(10px)",
           fontFamily: css.font,
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         {/* Header */}
@@ -379,42 +329,42 @@ export default function BookingModal({
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: 14 }}>
+        {/* Body (scroll) */}
+        <div
+          style={{
+            padding: 12,
+            overflowY: "auto",
+            flex: 1,
+          }}
+        >
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: 10,
+              gap: 8,
             }}
           >
             <div>
               <label style={labelStyle}>Date</label>
-              <div style={iconWrap}>
-                <input
-                  ref={firstFieldRef}
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  style={{ ...inputBase, ...padRightForIcon, border: fieldBorder("date") }}
-                  {...focusHandlers}
-                />
-                <IconCalendar />
-              </div>
+              <input
+                ref={firstFieldRef}
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                style={{ ...inputBase, border: fieldBorder("date") }}
+                {...focusHandlers}
+              />
             </div>
 
             <div>
               <label style={labelStyle}>Time</label>
-              <div style={iconWrap}>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  style={{ ...inputBase, ...padRightForIcon, border: fieldBorder("time") }}
-                  {...focusHandlers}
-                />
-                <IconClock />
-              </div>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                style={{ ...inputBase, border: fieldBorder("time") }}
+                {...focusHandlers}
+              />
             </div>
 
             <div>
@@ -460,17 +410,12 @@ export default function BookingModal({
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
                 placeholder="Allergies, seating, etc."
-                style={{
-                  ...inputBase,
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  resize: "none",
-                }}
+                style={textareaBase}
                 {...focusHandlers}
               />
             </div>
           </div>
 
-          {/* Error */}
           {err && (
             <div
               style={{
@@ -487,7 +432,6 @@ export default function BookingModal({
             </div>
           )}
 
-          {/* Availability */}
           {availability?.slots?.length ? (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 12, color: css.muted, marginBottom: 8 }}>
@@ -527,14 +471,27 @@ export default function BookingModal({
             </div>
           ) : null}
 
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <div style={{ marginTop: 12, fontSize: 11, color: css.muted }}>
+            This creates a real booking for venue:{" "}
+            <code style={{ color: css.text }}>{venueId}</code>
+          </div>
+        </div>
+
+        {/* Actions (sticky footer) */}
+        <div
+          style={{
+            padding: 12,
+            borderTop: `1px solid ${css.border}`,
+            background: "rgba(0,0,0,0.18)",
+          }}
+        >
+          <div style={{ display: "flex", gap: 10 }}>
             <button
               onClick={onCheckAvailability}
               disabled={checking || busy}
               style={{
                 flex: 1,
-                padding: "11px 12px",
+                padding: "10px 12px",
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.12)",
                 background: "rgba(255,255,255,0.06)",
@@ -552,7 +509,7 @@ export default function BookingModal({
               disabled={busy}
               style={{
                 flex: 1,
-                padding: "11px 12px",
+                padding: "10px 12px",
                 borderRadius: 14,
                 border: "0",
                 background: busy
@@ -567,12 +524,6 @@ export default function BookingModal({
             >
               {busy ? "Booking..." : "Confirm"}
             </button>
-          </div>
-
-          {/* Footer note */}
-          <div style={{ marginTop: 12, fontSize: 11, color: css.muted }}>
-            This creates a real booking for venue:{" "}
-            <code style={{ color: css.text }}>{venueId}</code>
           </div>
         </div>
       </div>
