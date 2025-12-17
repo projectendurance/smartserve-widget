@@ -125,13 +125,11 @@ export default function Widget({
     void: "var(--ss-void, #040307)",
     navy1: "var(--ss-navy-1, #000010)",
     navy2: "var(--ss-navy-2, #000818)",
-    surface: "var(--ss-surface, rgba(255,255,255,0.06))",
     border: "var(--ss-border, rgba(255,255,255,0.10))",
     text: "var(--ss-text, rgba(255,255,255,0.92))",
     muted: "var(--ss-muted, rgba(255,255,255,0.65))",
     orange: "var(--ss-orange, #F84400)",
     orange2: "var(--ss-orange-2, #F85800)",
-    orangeSoft: "var(--ss-orange-soft, rgba(248,68,0,0.25))",
   };
 
   return (
@@ -149,10 +147,9 @@ export default function Widget({
             flexDirection: "column",
             position: "relative",
             border: `1px solid ${css.border}`,
-            boxShadow:
-              "0 30px 90px rgba(0,0,0,0.70), 0 0 0 6px rgba(248,68,0,0.06)",
+            boxShadow: "0 30px 90px rgba(0,0,0,0.70)",
             background: `
-              radial-gradient(900px 500px at 50% 10%, rgba(248,68,0,0.20), transparent 55%),
+              radial-gradient(900px 500px at 50% 10%, rgba(248,68,0,0.12), transparent 55%),
               radial-gradient(700px 520px at 50% 75%, rgba(0,8,24,0.95), transparent 60%),
               linear-gradient(180deg, ${css.navy1}, ${css.void})
             `,
@@ -171,28 +168,18 @@ export default function Widget({
             }}
           >
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {/* Simple “ring” mark */}
+              {/* Clean orange status dot (no black-hole icon) */}
               <div
                 aria-hidden
                 style={{
-                  width: 30,
-                  height: 30,
+                  width: 10,
+                  height: 10,
                   borderRadius: 999,
-                  background: `radial-gradient(circle at 35% 35%, ${css.orange2}, ${css.orange})`,
-                  boxShadow: `0 10px 30px rgba(248,68,0,0.25)`,
-                  position: "relative",
+                  background: css.orange,
+                  boxShadow: "0 0 0 4px rgba(248,68,0,0.12)",
+                  flex: "0 0 auto",
                 }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 7,
-                    borderRadius: 999,
-                    background: css.void,
-                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)",
-                  }}
-                />
-              </div>
+              />
 
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <div
@@ -273,7 +260,7 @@ export default function Widget({
                         isUser ? "rgba(248,68,0,0.35)" : "rgba(255,255,255,0.10)"
                       }`,
                       background: isUser
-                        ? `linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))`
+                        ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
                         : "rgba(255,255,255,0.06)",
                       color: css.text,
                       fontFamily:
@@ -304,9 +291,17 @@ export default function Widget({
                     fontFamily:
                       "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial",
                     fontSize: 12,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  Typing…
+                  <span style={{ opacity: 0.9 }}>Typing</span>
+                  <span className="ss-typing" aria-label="Assistant typing">
+                    <span className="dot" />
+                    <span className="dot" />
+                    <span className="dot" />
+                  </span>
                 </div>
               </div>
             )}
@@ -325,8 +320,8 @@ export default function Widget({
                 "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial",
             }}
           >
-            Allergy / intolerance note: dish descriptions may change. For allergen or ingredient-safety
-            information, please contact the restaurant directly.
+            Allergy / intolerance note: dish descriptions may change. For allergen or
+            ingredient-safety information, please contact the restaurant directly.
           </div>
 
           {/* Booking Modal (server-driven) */}
@@ -346,7 +341,10 @@ export default function Widget({
               if (result?.status === "requires_payment" && result?.checkout_url) {
                 setMsgs((m) => [
                   ...m,
-                  { role: "assistant", text: `Deposit required to confirm.\nPay here: ${result.checkout_url}` },
+                  {
+                    role: "assistant",
+                    text: `Deposit required to confirm.\nPay here: ${result.checkout_url}`,
+                  },
                 ]);
                 return;
               }
@@ -439,7 +437,7 @@ export default function Widget({
         </div>
       )}
 
-      {/* Launcher button */}
+      {/* Launcher button (navy background + orange text, no icon) */}
       <button
         onClick={() => setOpen((v) => !v)}
         title={title}
@@ -449,53 +447,27 @@ export default function Widget({
           gap: 10,
           padding: "12px 14px",
           borderRadius: 999,
-          border: `1px solid ${open ? "rgba(248,68,0,0.35)" : "rgba(255,255,255,0.10)"}`,
-          background: open
-            ? `linear-gradient(180deg, rgba(248,68,0,0.18), rgba(0,0,0,0.25))`
-            : `linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))`,
-          color: css.text,
+          border: "1px solid rgba(248,68,0,0.35)",
+          background: `linear-gradient(180deg, ${css.navy1}, ${css.void})`,
+          color: css.orange,
           cursor: "pointer",
-          boxShadow:
-            "0 18px 50px rgba(0,0,0,0.55), 0 0 0 6px rgba(248,68,0,0.06)",
+          boxShadow: "0 18px 50px rgba(0,0,0,0.55)",
           backdropFilter: "blur(10px)",
           fontFamily:
             "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial",
           maxWidth: 360,
         }}
       >
-        <div
-          aria-hidden
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 999,
-            background: `radial-gradient(circle at 35% 35%, ${css.orange2}, ${css.orange})`,
-            boxShadow: "0 12px 30px rgba(248,68,0,0.22)",
-            position: "relative",
-            flex: "0 0 auto",
-          }}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 8,
-              borderRadius: 999,
-              background: css.void,
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.10)",
-            }}
-          />
-        </div>
-
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
           <div style={{ fontWeight: 900, fontSize: 13, lineHeight: 1.15 }}>
             Chat Assistant
           </div>
-          <div style={{ fontSize: 11, color: css.muted, lineHeight: 1.15 }}>
+          <div style={{ fontSize: 11, color: "rgba(248,68,0,0.75)", lineHeight: 1.15 }}>
             Powered by SmartServe AI
           </div>
         </div>
 
-        <div style={{ marginLeft: "auto", fontSize: 12, color: css.muted }}>
+        <div style={{ marginLeft: "auto", fontSize: 12, color: "rgba(248,68,0,0.75)" }}>
           {open ? "Close" : "Open"}
         </div>
       </button>

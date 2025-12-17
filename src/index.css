@@ -41,12 +41,11 @@ html, body {
   font-family: var(--ss-font);
 }
 
-/* Optional: apply a “black-hole” backdrop if your widget owns the whole root */
 #root {
   min-height: 100%;
 }
 
-/* ====== Reusable classes (use these in smartservewidget.tsx) ====== */
+/* ====== Reusable classes ====== */
 .ss-widget {
   color: var(--ss-text);
   background:
@@ -102,3 +101,26 @@ html, body {
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.22);
 }
+
+/* ===== Typing dots ===== */
+@keyframes ssDot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.ss-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-typing .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ss-orange, #F84400);
+  animation: ssDot 1.05s infinite ease-in-out;
+}
+
+.ss-typing .dot:nth-child(2) { animation-delay: 0.15s; }
+.ss-typing .dot:nth-child(3) { animation-delay: 0.30s; }
