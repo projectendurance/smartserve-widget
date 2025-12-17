@@ -1,6 +1,6 @@
 // src/components/BookingModal.tsx
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type {
   AvailabilityResponse,
   BookingPrefill,
@@ -25,6 +25,8 @@ type Props = {
   onBooked: (result: CreateBookingResponse) => void;
 };
 
+type Step = 1 | 2 | 3;
+
 function normalizePrefillTime(t?: string) {
   const s = (t || "").trim();
   const m = s.match(/^(\d{1,2}):(\d{2})/);
@@ -32,6 +34,20 @@ function normalizePrefillTime(t?: string) {
   const hh = String(Math.min(23, Math.max(0, Number(m[1])))).padStart(2, "0");
   const mm = String(Math.min(59, Math.max(0, Number(m[2])))).padStart(2, "0");
   return `${hh}:${mm}`;
+}
+
+function uniqueAvailableSlots(res: AvailabilityResponse | null) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of res?.slots || []) {
+    if (!s?.available) continue;
+    const t = String((s as any).time_24h ?? "").trim();
+    if (!t) continue;
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+  }
+  return out;
 }
 
 export default function BookingModal({
@@ -45,6 +61,10 @@ export default function BookingModal({
   prefill,
   onBooked,
 }: Props) {
+  // Step flow
+  const [step, setStep] = useState<Step>(1);
+
+  // Form state
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [partySize, setPartySize] = useState<number>(2);
@@ -52,6 +72,7 @@ export default function BookingModal({
   const [contact, setContact] = useState("");
   const [notes, setNotes] = useState("");
 
+  // UI state
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -60,6 +81,7 @@ export default function BookingModal({
 
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
+  // Theme tokens
   const css = {
     void: "var(--ss-void, #040307)",
     navy1: "var(--ss-navy-1, #000010)",
@@ -74,34 +96,110 @@ export default function BookingModal({
       "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial",
   };
 
-  // Apply prefill whenever it changes (server-driven)
+  const panelBg = `
+    radial-gradient(900px 520px at 50% 0%, rgba(248,68,0,0.10), transparent 58%),
+    radial-gradient(700px 520px at 50% 90%, rgba(0,8,24,0.95), transparent 60%),
+    linear-gradient(180deg, ${css.navy1}, ${css.void})
+  `;
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12,
+    color: css.muted,
+    letterSpacing: 0.2,
+    fontFamily: css.font,
+    marginBottom: 6,
+    display: "block",
+  };
+
+  const inputBase: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    height: 40,
+    padding: "9px 10px",
+    borderRadius: 12,
+    background: "rgba(0,0,0,0.22)",
+    color: css.text,
+    outline: "none",
+    fontFamily: css.font,
+    fontSize: 12.5,
+    lineHeight: "16px",
+    border: "1px solid rgba(255,255,255,0.12)",
+    transition:
+      "box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease",
+  };
+
+  const textareaBase: React.CSSProperties = {
+    ...inputBase,
+    height: "auto",
+    minHeight: 64,
+    paddingTop: 10,
+    paddingBottom: 10,
+    resize: "none",
+  };
+
+  const focusHandlers = {
+    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.currentTarget.style.borderColor = String(css.orangeRing);
+      e.currentTarget.style.boxShadow = `0 0 0 3px ${css.orangeSoft}`;
+      e.currentTarget.style.filter = "brightness(1.03)";
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      e.currentTarget.style.boxShadow = "none";
+      e.currentTarget.style.filter = "none";
+    },
+  } as const;
+
+  // Prefill
   useEffect(() => {
     if (!open) return;
-    if (!prefill) return;
+
+    // Reset per-open UI state
+    setErr(null);
+    setBusy(false);
+    setChecking(false);
+
+    if (!prefill) {
+      // keep user values if re-opened; just keep step sane
+      setStep(1);
+      setAvailability(null);
+      return;
+    }
 
     if (typeof prefill.party_size === "number") setPartySize(prefill.party_size);
     if (prefill.date) setDate(prefill.date);
-    if (prefill.time) setTime(normalizePrefillTime(prefill.time));
+
+    if (prefill.time) {
+      const t = normalizePrefillTime(prefill.time);
+      setTime(t);
+    }
+
     if (prefill.name) setName(prefill.name);
     if (prefill.contact) setContact(prefill.contact);
     if (prefill.special_requests) setNotes(prefill.special_requests);
 
-    setErr(null);
+    // Step jump logic
+    const hasDate = Boolean(prefill.date);
+    const hasParty = typeof prefill.party_size === "number" && prefill.party_size > 0;
+    const hasTime = Boolean(prefill.time);
+    const hasName = Boolean(prefill.name);
+
+    if (hasDate && hasParty && hasTime) {
+      setStep(hasName ? 3 : 3);
+    } else {
+      setStep(1);
+    }
+
     setAvailability(null);
   }, [prefill, open]);
 
+  // Focus first field on open / step change
   useEffect(() => {
-    if (!open) {
-      setErr(null);
-      setAvailability(null);
-      setBusy(false);
-      setChecking(false);
-      return;
-    }
+    if (!open) return;
     const t = setTimeout(() => firstFieldRef.current?.focus(), 80);
     return () => clearTimeout(t);
-  }, [open]);
+  }, [open, step]);
 
+  // ESC close
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -111,7 +209,13 @@ export default function BookingModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const missing = useMemo(() => {
+  const availableTimes = useMemo(
+    () => uniqueAvailableSlots(availability).slice(0, 24),
+    [availability]
+  );
+
+  // Validation per-step
+  const missingForConfirm = useMemo(() => {
     const out: string[] = [];
     if (!name.trim()) out.push("name");
     if (!date) out.push("date");
@@ -120,7 +224,11 @@ export default function BookingModal({
     return out;
   }, [name, date, time, partySize]);
 
-  async function onCheckAvailability() {
+  const canSeeTimes = Boolean(date) && partySize >= 1 && !checking && !busy;
+  const canContinueFromTimes = Boolean(time) && !checking && !busy;
+  const canConfirm = missingForConfirm.length === 0 && !busy;
+
+  async function onSeeTimes() {
     setErr(null);
     setAvailability(null);
 
@@ -139,11 +247,20 @@ export default function BookingModal({
           venue_id: venueId,
           date,
           party_size: partySize,
-          time_24h: time ? time : null,
+          time_24h: null, // IMPORTANT: step 2 is where time is chosen
         },
         availabilityPath
       );
       setAvailability(res);
+
+      const times = uniqueAvailableSlots(res);
+      if (times.length) {
+        // if current time isn't in suggestions, clear it
+        if (time && !times.includes(time)) setTime("");
+        setStep(2);
+      } else {
+        setErr("No availability returned for that date/party size.");
+      }
     } catch (e: any) {
       setErr(String(e?.message || "Availability check failed."));
     } finally {
@@ -154,8 +271,8 @@ export default function BookingModal({
   async function onConfirm() {
     setErr(null);
 
-    if (missing.length) {
-      setErr(`Missing: ${missing.join(", ")}.`);
+    if (missingForConfirm.length) {
+      setErr(`Missing: ${missingForConfirm.join(", ")}.`);
       return;
     }
 
@@ -186,68 +303,45 @@ export default function BookingModal({
     }
   }
 
+  function StepPills() {
+    const pill = (n: Step, label: string) => {
+      const active = step === n;
+      const done = step > n;
+      return (
+        <div
+          key={n}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 999,
+            border: active || done
+              ? "1px solid rgba(248,68,0,0.40)"
+              : "1px solid rgba(255,255,255,0.12)",
+            background: active
+              ? "linear-gradient(90deg, rgba(248,68,0,0.18), rgba(248,88,0,0.10))"
+              : "rgba(255,255,255,0.06)",
+            color: css.text,
+            fontSize: 11,
+            fontFamily: css.font,
+            fontWeight: active ? 900 : 700,
+            opacity: done ? 0.95 : 1,
+            userSelect: "none",
+          }}
+        >
+          {label}
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {pill(1, "1. When")}
+        {pill(2, "2. Time")}
+        {pill(3, "3. Details")}
+      </div>
+    );
+  }
+
   if (!open) return null;
-
-  const panelBg = `
-    radial-gradient(900px 520px at 50% 0%, rgba(248,68,0,0.10), transparent 58%),
-    radial-gradient(700px 520px at 50% 90%, rgba(0,8,24,0.95), transparent 60%),
-    linear-gradient(180deg, ${css.navy1}, ${css.void})
-  `;
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: css.muted,
-    letterSpacing: 0.2,
-    fontFamily: css.font,
-    marginBottom: 6,
-    display: "block",
-  };
-
-  // KEY FIXES FOR YOUR SPACING / MISALIGNMENT:
-  // - boxSizing: border-box so padding doesn't cause weird widths
-  // - height consistent to stop date/time being taller/shorter than others
-  // - remove overlay icons (they are what visually mess the date/time fields in many browsers)
-  const inputBase: React.CSSProperties = {
-    width: "100%",
-    boxSizing: "border-box",
-    height: 40,
-    padding: "9px 10px",
-    borderRadius: 12,
-    background: "rgba(0,0,0,0.22)",
-    color: css.text,
-    outline: "none",
-    fontFamily: css.font,
-    fontSize: 12.5,
-    lineHeight: "16px",
-    border: "1px solid rgba(255,255,255,0.12)",
-    transition: "box-shadow 160ms ease, border-color 160ms ease, filter 160ms ease",
-  };
-
-  const textareaBase: React.CSSProperties = {
-    ...inputBase,
-    height: "auto",
-    minHeight: 64,
-    paddingTop: 10,
-    paddingBottom: 10,
-    resize: "none",
-  };
-
-  const focusHandlers = {
-    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      e.currentTarget.style.borderColor = String(css.orangeRing);
-      e.currentTarget.style.boxShadow = `0 0 0 3px ${css.orangeSoft}`;
-      e.currentTarget.style.filter = "brightness(1.03)";
-    },
-    onBlur: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      e.currentTarget.style.boxShadow = "none";
-      e.currentTarget.style.filter = "none";
-    },
-  } as const;
-
-  const fieldBorder = (key: string) =>
-    missing.includes(key)
-      ? `1px solid ${css.orangeRing}`
-      : "1px solid rgba(255,255,255,0.12)";
 
   return (
     <div
@@ -270,7 +364,7 @@ export default function BookingModal({
         style={{
           width: "100%",
           maxWidth: 360,
-          maxHeight: 440,
+          maxHeight: 460,
           borderRadius: 18,
           overflow: "hidden",
           border: `1px solid ${css.border}`,
@@ -293,7 +387,7 @@ export default function BookingModal({
             background: "rgba(0,0,0,0.18)",
           }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div
               style={{
                 color: css.text,
@@ -304,9 +398,7 @@ export default function BookingModal({
             >
               Book a table
             </div>
-            <div style={{ color: css.muted, fontSize: 11 }}>
-              Fill the details below to confirm.
-            </div>
+            <StepPills />
           </div>
 
           <button
@@ -323,6 +415,7 @@ export default function BookingModal({
               cursor: "pointer",
               fontSize: 18,
               lineHeight: 1,
+              flex: "0 0 auto",
             }}
           >
             ×
@@ -337,85 +430,230 @@ export default function BookingModal({
             flex: 1,
           }}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 8,
-            }}
-          >
-            <div>
-              <label style={labelStyle}>Date</label>
-              <input
-                ref={firstFieldRef}
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                style={{ ...inputBase, border: fieldBorder("date") }}
-                {...focusHandlers}
-              />
-            </div>
+          {/* Step 1 */}
+          {step === 1 && (
+            <>
+              <div style={{ marginBottom: 10, fontSize: 12, color: css.muted }}>
+                Choose date + party size. Then we’ll show available times.
+              </div>
 
-            <div>
-              <label style={labelStyle}>Time</label>
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                style={{ ...inputBase, border: fieldBorder("time") }}
-                {...focusHandlers}
-              />
-            </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input
+                    ref={firstFieldRef}
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={{ ...inputBase }}
+                    {...focusHandlers}
+                  />
+                </div>
 
-            <div>
-              <label style={labelStyle}>Party size</label>
-              <input
-                type="number"
-                min={1}
-                value={partySize}
-                onChange={(e) => setPartySize(Number(e.target.value))}
-                style={{ ...inputBase, border: fieldBorder("party size") }}
-                {...focusHandlers}
-              />
-            </div>
+                <div>
+                  <label style={labelStyle}>Party size</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={partySize}
+                    onChange={(e) => setPartySize(Number(e.target.value))}
+                    style={{ ...inputBase }}
+                    {...focusHandlers}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
-            <div>
-              <label style={labelStyle}>Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                style={{ ...inputBase, border: fieldBorder("name") }}
-                {...focusHandlers}
-              />
-            </div>
+          {/* Step 2 */}
+          {step === 2 && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  marginBottom: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ fontSize: 12, color: css.muted }}>
+                  Pick an available time.
+                </div>
 
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Contact (optional)</label>
-              <input
-                type="text"
-                value={contact}
-                onChange={(e) => setContact(e.target.value)}
-                placeholder="Email or phone"
-                style={{ ...inputBase, border: "1px solid rgba(255,255,255,0.12)" }}
-                {...focusHandlers}
-              />
-            </div>
+                <button
+                  onClick={() => setStep(1)}
+                  disabled={checking || busy}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "7px 10px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.06)",
+                    color: css.text,
+                    cursor: checking || busy ? "not-allowed" : "pointer",
+                    fontSize: 12,
+                    fontFamily: css.font,
+                    fontWeight: 800,
+                  }}
+                >
+                  Back
+                </button>
+              </div>
 
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Special requests (optional)</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                placeholder="Allergies, seating, etc."
-                style={textareaBase}
-                {...focusHandlers}
-              />
-            </div>
-          </div>
+              {availableTimes.length ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: 8,
+                  }}
+                >
+                  {availableTimes.map((t) => {
+                    const active = t === time;
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => setTime(t)}
+                        style={{
+                          padding: "10px 10px",
+                          borderRadius: 12,
+                          border: active
+                            ? "1px solid rgba(248,68,0,0.55)"
+                            : "1px solid rgba(255,255,255,0.12)",
+                          background: active
+                            ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
+                            : "rgba(255,255,255,0.06)",
+                          color: css.text,
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          fontFamily: css.font,
+                          fontWeight: active ? 900 : 800,
+                          textAlign: "center",
+                        }}
+                      >
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: css.muted }}>
+                  No times to show. Go back and try a different date/party size.
+                </div>
+              )}
+            </>
+          )}
 
+          {/* Step 3 */}
+          {step === 3 && (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  marginBottom: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ fontSize: 12, color: css.muted }}>
+                  Enter your details to confirm.
+                </div>
+
+                <button
+                  onClick={() => setStep(2)}
+                  disabled={checking || busy}
+                  style={{
+                    marginLeft: "auto",
+                    padding: "7px 10px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.06)",
+                    color: css.text,
+                    cursor: checking || busy ? "not-allowed" : "pointer",
+                    fontSize: 12,
+                    fontFamily: css.font,
+                    fontWeight: 800,
+                  }}
+                >
+                  Back
+                </button>
+              </div>
+
+              {/* Summary row */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 10,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "7px 10px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.06)",
+                    color: css.text,
+                    fontSize: 11.5,
+                    fontFamily: css.font,
+                    fontWeight: 800,
+                  }}
+                >
+                  {date || "—"} • {time || "—"} • {partySize}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Name</label>
+                  <input
+                    ref={firstFieldRef}
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    style={{ ...inputBase }}
+                    {...focusHandlers}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Contact (optional)</label>
+                  <input
+                    type="text"
+                    value={contact}
+                    onChange={(e) => setContact(e.target.value)}
+                    placeholder="Email or phone"
+                    style={{ ...inputBase }}
+                    {...focusHandlers}
+                  />
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Special requests (optional)</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Allergies, seating, etc."
+                    style={textareaBase}
+                    {...focusHandlers}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Error */}
           {err && (
             <div
               style={{
@@ -431,50 +669,6 @@ export default function BookingModal({
               {err}
             </div>
           )}
-
-          {availability?.slots?.length ? (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 12, color: css.muted, marginBottom: 8 }}>
-                Suggested times
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {availability.slots
-                  .filter((s) => s.available)
-                  .slice(0, 10)
-                  .map((s) => {
-                    const active = s.time_24h === time;
-                    return (
-                      <button
-                        key={s.time_24h}
-                        onClick={() => setTime(s.time_24h)}
-                        style={{
-                          padding: "8px 10px",
-                          borderRadius: 999,
-                          border: active
-                            ? "1px solid rgba(248,68,0,0.55)"
-                            : "1px solid rgba(255,255,255,0.12)",
-                          background: active
-                            ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
-                            : "rgba(255,255,255,0.06)",
-                          color: css.text,
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontFamily: css.font,
-                        }}
-                        title="Use this time"
-                      >
-                        {s.time_24h}
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          ) : null}
-
-          <div style={{ marginTop: 12, fontSize: 11, color: css.muted }}>
-            This creates a real booking for venue:{" "}
-            <code style={{ color: css.text }}>{venueId}</code>
-          </div>
         </div>
 
         {/* Actions (sticky footer) */}
@@ -486,44 +680,86 @@ export default function BookingModal({
           }}
         >
           <div style={{ display: "flex", gap: 10 }}>
-            <button
-              onClick={onCheckAvailability}
-              disabled={checking || busy}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                borderRadius: 14,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.06)",
-                color: css.text,
-                cursor: checking || busy ? "not-allowed" : "pointer",
-                fontWeight: 800,
-                fontFamily: css.font,
-              }}
-            >
-              {checking ? "Checking..." : "Check"}
-            </button>
+            {step === 1 && (
+              <>
+                <button
+                  onClick={onSeeTimes}
+                  disabled={!canSeeTimes}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    background: "rgba(255,255,255,0.06)",
+                    color: css.text,
+                    cursor: !canSeeTimes ? "not-allowed" : "pointer",
+                    fontWeight: 900,
+                    fontFamily: css.font,
+                  }}
+                >
+                  {checking ? "Checking..." : "See times"}
+                </button>
+              </>
+            )}
 
-            <button
-              onClick={onConfirm}
-              disabled={busy}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                borderRadius: 14,
-                border: "0",
-                background: busy
-                  ? "rgba(255,255,255,0.08)"
-                  : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
-                color: busy ? css.muted : "#0b0b0b",
-                cursor: busy ? "not-allowed" : "pointer",
-                fontWeight: 900,
-                fontFamily: css.font,
-                boxShadow: busy ? "none" : "0 16px 35px rgba(248,68,0,0.22)",
-              }}
-            >
-              {busy ? "Booking..." : "Confirm"}
-            </button>
+            {step === 2 && (
+              <>
+                <button
+                  onClick={() => setStep(3)}
+                  disabled={!canContinueFromTimes}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    border: "0",
+                    background: !canContinueFromTimes
+                      ? "rgba(255,255,255,0.08)"
+                      : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
+                    color: !canContinueFromTimes ? css.muted : "#0b0b0b",
+                    cursor: !canContinueFromTimes ? "not-allowed" : "pointer",
+                    fontWeight: 900,
+                    fontFamily: css.font,
+                    boxShadow: !canContinueFromTimes
+                      ? "none"
+                      : "0 16px 35px rgba(248,68,0,0.22)",
+                  }}
+                >
+                  Continue
+                </button>
+              </>
+            )}
+
+            {step === 3 && (
+              <>
+                <button
+                  onClick={onConfirm}
+                  disabled={!canConfirm}
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 14,
+                    border: "0",
+                    background: !canConfirm
+                      ? "rgba(255,255,255,0.08)"
+                      : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
+                    color: !canConfirm ? css.muted : "#0b0b0b",
+                    cursor: !canConfirm ? "not-allowed" : "pointer",
+                    fontWeight: 900,
+                    fontFamily: css.font,
+                    boxShadow: !canConfirm
+                      ? "none"
+                      : "0 16px 35px rgba(248,68,0,0.22)",
+                  }}
+                >
+                  {busy ? "Booking..." : "Confirm booking"}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div style={{ marginTop: 10, fontSize: 11, color: css.muted }}>
+            This creates a real booking for venue:{" "}
+            <code style={{ color: css.text }}>{venueId}</code>
           </div>
         </div>
       </div>
