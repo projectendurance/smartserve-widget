@@ -392,6 +392,9 @@ export default function BookingModal({
               inputBase={inputBase}
               focusHandlers={focusHandlers}
               introTextStyle={introTextStyle}
+              text={css.text}
+              muted={css.muted}
+              border={"rgba(255,255,255,0.12)"}
             />
           )}
 

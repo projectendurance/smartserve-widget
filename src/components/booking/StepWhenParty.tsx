@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import DatePicker from "./DatePicker";
 
 type Props = {
   date: string;
@@ -9,12 +10,18 @@ type Props = {
 
   labelStyle: React.CSSProperties;
   inputBase: React.CSSProperties;
+
   focusHandlers: {
-    onFocus: (e: React.FocusEvent<HTMLInputElement>) => void;
-    onBlur: (e: React.FocusEvent<HTMLInputElement>) => void;
+    onFocus: (e: React.FocusEvent<any>) => void;
+    onBlur: (e: React.FocusEvent<any>) => void;
   };
 
   introTextStyle: React.CSSProperties;
+
+  // new (for DatePicker styling)
+  text: string;
+  muted: string;
+  border: string;
 };
 
 export default function StepWhenParty({
@@ -26,8 +33,11 @@ export default function StepWhenParty({
   inputBase,
   focusHandlers,
   introTextStyle,
+  text,
+  muted,
+  border,
 }: Props) {
-  const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const firstFieldRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => firstFieldRef.current?.focus(), 60);
@@ -49,14 +59,19 @@ export default function StepWhenParty({
       >
         <div>
           <label style={labelStyle}>Date</label>
-          <input
-            ref={firstFieldRef}
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            style={{ ...inputBase }}
-            {...focusHandlers}
-          />
+
+          {/* wrapper exists only so we can auto-focus something on step open */}
+          <div ref={firstFieldRef} tabIndex={-1} style={{ outline: "none" }}>
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              inputBase={inputBase}
+              focusHandlers={focusHandlers}
+              text={text}
+              muted={muted}
+              border={border}
+            />
+          </div>
         </div>
 
         <div>
