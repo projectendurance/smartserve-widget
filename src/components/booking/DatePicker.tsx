@@ -174,27 +174,36 @@ export default function DatePicker({
     userSelect: "none",
   };
 
-  // Premium popover surface aligned to your CSS tokens
+  // UPDATED: open DOWN + compact + premium surface using your theme tokens
   const popStyle: React.CSSProperties = {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: "calc(100% + 8px)",
+
+    // open DOWN (prevents collisions in the modal)
+    top: "calc(100% + 8px)",
+    bottom: "auto",
+
     borderRadius: 16,
     border: `1px solid ${border}`,
     background:
-      "linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
+      "radial-gradient(650px 280px at 50% 0%, rgba(248, 68, 0, 0.12), transparent 60%), linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
     backdropFilter: "blur(12px)",
     boxShadow:
       "0 18px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,68,0,0.18)",
     padding: 10,
     zIndex: 50,
+
+    // compact / safe sizing
+    maxWidth: 320,
+    margin: "0 auto",
   };
 
+  // UPDATED: smaller header buttons
   const headerBtn: React.CSSProperties = {
-    height: 32,
-    width: 32,
-    borderRadius: 12,
+    height: 28,
+    width: 28,
+    borderRadius: 10,
     border: `1px solid ${border}`,
     background: "rgba(255,255,255,0.06)",
     color: text,
@@ -215,7 +224,6 @@ export default function DatePicker({
   };
 
   const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
   const tomorrow = useMemo(() => addDays(today, 1), [today]);
 
   return (
@@ -330,7 +338,7 @@ export default function DatePicker({
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 6,
+              gap: 5,
               marginBottom: 6,
             }}
           >
@@ -354,7 +362,7 @@ export default function DatePicker({
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 6,
+              gap: 5,
             }}
           >
             {days.map(({ date, inMonth }, idx) => {
@@ -372,8 +380,8 @@ export default function DatePicker({
                     setOpen(false);
                   }}
                   style={{
-                    height: 34,
-                    borderRadius: 12,
+                    height: 30,
+                    borderRadius: 10,
                     border: active
                       ? "1px solid var(--ss-orange-ring)"
                       : `1px solid ${border}`,
@@ -399,26 +407,7 @@ export default function DatePicker({
             })}
           </div>
 
-          {/* Footer actions */}
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              style={{
-                flex: 1,
-                padding: "9px 10px",
-                borderRadius: 14,
-                border: `1px solid ${border}`,
-                background: "rgba(255,255,255,0.06)",
-                color: text,
-                cursor: "pointer",
-                fontWeight: 900,
-                fontSize: 12,
-              }}
-            >
-              Close
-            </button>
-          </div>
+          {/* Footer actions (removed big Close button for compact UX) */}
         </div>
       )}
     </div>
