@@ -1,12 +1,19 @@
 // src/components/BookingModal.tsx
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type {
   AvailabilityResponse,
   BookingPrefill,
   CreateBookingResponse,
 } from "../lib/types";
 import { checkAvailability, createBooking } from "../lib/bookingClient";
+
+// NEW: split-step components
+import BookingStepPills from "./booking/BookingStepPills";
+import type { Step } from "./booking/BookingStepPills";
+import StepWhenParty from "./booking/StepWhenParty";
+import StepPickTime from "./booking/StepPickTime";
+import StepDetails from "./booking/StepDetails";
 
 type Props = {
   open: boolean;
@@ -24,8 +31,6 @@ type Props = {
 
   onBooked: (result: CreateBookingResponse) => void;
 };
-
-type Step = 1 | 2 | 3;
 
 function normalizePrefillTime(t?: string) {
   const s = (t || "").trim();
@@ -78,8 +83,6 @@ export default function BookingModal({
   const [err, setErr] = useState<string | null>(null);
   const [availability, setAvailability] =
     useState<AvailabilityResponse | null>(null);
-
-  const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
   // Theme tokens
   const css = {
@@ -149,6 +152,12 @@ export default function BookingModal({
     },
   } as const;
 
+  const introTextStyle: React.CSSProperties = {
+    marginBottom: 10,
+    fontSize: 12,
+    color: css.muted,
+  };
+
   // Prefill
   useEffect(() => {
     if (!open) return;
@@ -159,7 +168,6 @@ export default function BookingModal({
     setChecking(false);
 
     if (!prefill) {
-      // keep user values if re-opened; just keep step sane
       setStep(1);
       setAvailability(null);
       return;
@@ -177,27 +185,16 @@ export default function BookingModal({
     if (prefill.contact) setContact(prefill.contact);
     if (prefill.special_requests) setNotes(prefill.special_requests);
 
-    // Step jump logic
     const hasDate = Boolean(prefill.date);
-    const hasParty = typeof prefill.party_size === "number" && prefill.party_size > 0;
+    const hasParty =
+      typeof prefill.party_size === "number" && prefill.party_size > 0;
     const hasTime = Boolean(prefill.time);
-    const hasName = Boolean(prefill.name);
 
-    if (hasDate && hasParty && hasTime) {
-      setStep(hasName ? 3 : 3);
-    } else {
-      setStep(1);
-    }
+    if (hasDate && hasParty && hasTime) setStep(3);
+    else setStep(1);
 
     setAvailability(null);
   }, [prefill, open]);
-
-  // Focus first field on open / step change
-  useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(() => firstFieldRef.current?.focus(), 80);
-    return () => clearTimeout(t);
-  }, [open, step]);
 
   // ESC close
   useEffect(() => {
@@ -214,7 +211,6 @@ export default function BookingModal({
     [availability]
   );
 
-  // Validation per-step
   const missingForConfirm = useMemo(() => {
     const out: string[] = [];
     if (!name.trim()) out.push("name");
@@ -247,7 +243,7 @@ export default function BookingModal({
           venue_id: venueId,
           date,
           party_size: partySize,
-          time_24h: null, // IMPORTANT: step 2 is where time is chosen
+          time_24h: null,
         },
         availabilityPath
       );
@@ -255,7 +251,6 @@ export default function BookingModal({
 
       const times = uniqueAvailableSlots(res);
       if (times.length) {
-        // if current time isn't in suggestions, clear it
         if (time && !times.includes(time)) setTime("");
         setStep(2);
       } else {
@@ -301,44 +296,6 @@ export default function BookingModal({
     } finally {
       setBusy(false);
     }
-  }
-
-  function StepPills() {
-    const pill = (n: Step, label: string) => {
-      const active = step === n;
-      const done = step > n;
-      return (
-        <div
-          key={n}
-          style={{
-            padding: "6px 10px",
-            borderRadius: 999,
-            border: active || done
-              ? "1px solid rgba(248,68,0,0.40)"
-              : "1px solid rgba(255,255,255,0.12)",
-            background: active
-              ? "linear-gradient(90deg, rgba(248,68,0,0.18), rgba(248,88,0,0.10))"
-              : "rgba(255,255,255,0.06)",
-            color: css.text,
-            fontSize: 11,
-            fontFamily: css.font,
-            fontWeight: active ? 900 : 700,
-            opacity: done ? 0.95 : 1,
-            userSelect: "none",
-          }}
-        >
-          {label}
-        </div>
-      );
-    };
-
-    return (
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {pill(1, "1. When")}
-        {pill(2, "2. Time")}
-        {pill(3, "3. Details")}
-      </div>
-    );
   }
 
   if (!open) return null;
@@ -398,7 +355,8 @@ export default function BookingModal({
             >
               Book a table
             </div>
-            <StepPills />
+
+            <BookingStepPills step={step} />
           </div>
 
           <button
@@ -422,238 +380,57 @@ export default function BookingModal({
           </button>
         </div>
 
-        {/* Body (scroll) */}
-        <div
-          style={{
-            padding: 12,
-            overflowY: "auto",
-            flex: 1,
-          }}
-        >
-          {/* Step 1 */}
+        {/* Body */}
+        <div style={{ padding: 12, overflowY: "auto", flex: 1 }}>
           {step === 1 && (
-            <>
-              <div style={{ marginBottom: 10, fontSize: 12, color: css.muted }}>
-                Choose date + party size. Then we’ll show available times.
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input
-                    ref={firstFieldRef}
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={{ ...inputBase }}
-                    {...focusHandlers}
-                  />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Party size</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={partySize}
-                    onChange={(e) => setPartySize(Number(e.target.value))}
-                    style={{ ...inputBase }}
-                    {...focusHandlers}
-                  />
-                </div>
-              </div>
-            </>
+            <StepWhenParty
+              date={date}
+              partySize={partySize}
+              setDate={setDate}
+              setPartySize={setPartySize}
+              labelStyle={labelStyle}
+              inputBase={inputBase}
+              focusHandlers={focusHandlers}
+              introTextStyle={introTextStyle}
+            />
           )}
 
-          {/* Step 2 */}
           {step === 2 && (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  marginBottom: 10,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ fontSize: 12, color: css.muted }}>
-                  Pick an available time.
-                </div>
-
-                <button
-                  onClick={() => setStep(1)}
-                  disabled={checking || busy}
-                  style={{
-                    marginLeft: "auto",
-                    padding: "7px 10px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: css.text,
-                    cursor: checking || busy ? "not-allowed" : "pointer",
-                    fontSize: 12,
-                    fontFamily: css.font,
-                    fontWeight: 800,
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-
-              {availableTimes.length ? (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
-                    gap: 8,
-                  }}
-                >
-                  {availableTimes.map((t) => {
-                    const active = t === time;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setTime(t)}
-                        style={{
-                          padding: "10px 10px",
-                          borderRadius: 12,
-                          border: active
-                            ? "1px solid rgba(248,68,0,0.55)"
-                            : "1px solid rgba(255,255,255,0.12)",
-                          background: active
-                            ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
-                            : "rgba(255,255,255,0.06)",
-                          color: css.text,
-                          cursor: "pointer",
-                          fontSize: 12.5,
-                          fontFamily: css.font,
-                          fontWeight: active ? 900 : 800,
-                          textAlign: "center",
-                        }}
-                      >
-                        {t}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ fontSize: 12, color: css.muted }}>
-                  No times to show. Go back and try a different date/party size.
-                </div>
-              )}
-            </>
+            <StepPickTime
+              time={time}
+              setTime={setTime}
+              availableTimes={availableTimes}
+              disabled={checking || busy}
+              onBack={() => setStep(1)}
+              font={css.font}
+              text={css.text}
+              muted={css.muted}
+            />
           )}
 
-          {/* Step 3 */}
           {step === 3 && (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  marginBottom: 10,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ fontSize: 12, color: css.muted }}>
-                  Enter your details to confirm.
-                </div>
-
-                <button
-                  onClick={() => setStep(2)}
-                  disabled={checking || busy}
-                  style={{
-                    marginLeft: "auto",
-                    padding: "7px 10px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: css.text,
-                    cursor: checking || busy ? "not-allowed" : "pointer",
-                    fontSize: 12,
-                    fontFamily: css.font,
-                    fontWeight: 800,
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-
-              {/* Summary row */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  flexWrap: "wrap",
-                  marginBottom: 10,
-                }}
-              >
-                <div
-                  style={{
-                    padding: "7px 10px",
-                    borderRadius: 999,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: css.text,
-                    fontSize: 11.5,
-                    fontFamily: css.font,
-                    fontWeight: 800,
-                  }}
-                >
-                  {date || "—"} • {time || "—"} • {partySize}
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={labelStyle}>Name</label>
-                  <input
-                    ref={firstFieldRef}
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    style={{ ...inputBase }}
-                    {...focusHandlers}
-                  />
-                </div>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={labelStyle}>Contact (optional)</label>
-                  <input
-                    type="text"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    placeholder="Email or phone"
-                    style={{ ...inputBase }}
-                    {...focusHandlers}
-                  />
-                </div>
-
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={labelStyle}>Special requests (optional)</label>
-                  <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Allergies, seating, etc."
-                    style={textareaBase}
-                    {...focusHandlers}
-                  />
-                </div>
-              </div>
-            </>
+            <StepDetails
+              date={date}
+              time={time}
+              partySize={partySize}
+              name={name}
+              setName={setName}
+              contact={contact}
+              setContact={setContact}
+              notes={notes}
+              setNotes={setNotes}
+              textareaBase={textareaBase}
+              inputBase={inputBase}
+              labelStyle={labelStyle}
+              focusHandlers={focusHandlers}
+              onBack={() => setStep(2)}
+              disabled={checking || busy}
+              font={css.font}
+              text={css.text}
+              muted={css.muted}
+            />
           )}
 
-          {/* Error */}
           {err && (
             <div
               style={{
@@ -671,7 +448,7 @@ export default function BookingModal({
           )}
         </div>
 
-        {/* Actions (sticky footer) */}
+        {/* Sticky footer */}
         <div
           style={{
             padding: 12,
@@ -681,79 +458,73 @@ export default function BookingModal({
         >
           <div style={{ display: "flex", gap: 10 }}>
             {step === 1 && (
-              <>
-                <button
-                  onClick={onSeeTimes}
-                  disabled={!canSeeTimes}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 14,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: css.text,
-                    cursor: !canSeeTimes ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    fontFamily: css.font,
-                  }}
-                >
-                  {checking ? "Checking..." : "See times"}
-                </button>
-              </>
+              <button
+                onClick={onSeeTimes}
+                disabled={!canSeeTimes}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: css.text,
+                  cursor: !canSeeTimes ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                  fontFamily: css.font,
+                }}
+              >
+                {checking ? "Checking..." : "See times"}
+              </button>
             )}
 
             {step === 2 && (
-              <>
-                <button
-                  onClick={() => setStep(3)}
-                  disabled={!canContinueFromTimes}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 14,
-                    border: "0",
-                    background: !canContinueFromTimes
-                      ? "rgba(255,255,255,0.08)"
-                      : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
-                    color: !canContinueFromTimes ? css.muted : "#0b0b0b",
-                    cursor: !canContinueFromTimes ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    fontFamily: css.font,
-                    boxShadow: !canContinueFromTimes
-                      ? "none"
-                      : "0 16px 35px rgba(248,68,0,0.22)",
-                  }}
-                >
-                  Continue
-                </button>
-              </>
+              <button
+                onClick={() => setStep(3)}
+                disabled={!canContinueFromTimes}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  borderRadius: 14,
+                  border: "0",
+                  background: !canContinueFromTimes
+                    ? "rgba(255,255,255,0.08)"
+                    : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
+                  color: !canContinueFromTimes ? css.muted : "#0b0b0b",
+                  cursor: !canContinueFromTimes ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                  fontFamily: css.font,
+                  boxShadow: !canContinueFromTimes
+                    ? "none"
+                    : "0 16px 35px rgba(248,68,0,0.22)",
+                }}
+              >
+                Continue
+              </button>
             )}
 
             {step === 3 && (
-              <>
-                <button
-                  onClick={onConfirm}
-                  disabled={!canConfirm}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 14,
-                    border: "0",
-                    background: !canConfirm
-                      ? "rgba(255,255,255,0.08)"
-                      : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
-                    color: !canConfirm ? css.muted : "#0b0b0b",
-                    cursor: !canConfirm ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    fontFamily: css.font,
-                    boxShadow: !canConfirm
-                      ? "none"
-                      : "0 16px 35px rgba(248,68,0,0.22)",
-                  }}
-                >
-                  {busy ? "Booking..." : "Confirm booking"}
-                </button>
-              </>
+              <button
+                onClick={onConfirm}
+                disabled={!canConfirm}
+                style={{
+                  flex: 1,
+                  padding: "10px 12px",
+                  borderRadius: 14,
+                  border: "0",
+                  background: !canConfirm
+                    ? "rgba(255,255,255,0.08)"
+                    : `linear-gradient(90deg, ${css.orange}, ${css.orange2})`,
+                  color: !canConfirm ? css.muted : "#0b0b0b",
+                  cursor: !canConfirm ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                  fontFamily: css.font,
+                  boxShadow: !canConfirm
+                    ? "none"
+                    : "0 16px 35px rgba(248,68,0,0.22)",
+                }}
+              >
+                {busy ? "Booking..." : "Confirm booking"}
+              </button>
             )}
           </div>
 
