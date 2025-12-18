@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type Props = {
-  value: string;                 // "YYYY-MM-DD"
+  value: string; // "YYYY-MM-DD"
   onChange: (v: string) => void; // "YYYY-MM-DD"
   inputBase: React.CSSProperties;
   focusHandlers?: any;
@@ -45,12 +45,6 @@ function clampToTodayOrAfter(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x < t ? t : x;
-}
-
-function addDays(d: Date, n: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
 }
 
 function CalendarIcon({ color }: { color: string }) {
@@ -102,13 +96,11 @@ export default function DatePicker({
     startOfMonth(selected ? clampToTodayOrAfter(selected) : today)
   );
 
-  // keep calendar month in sync when value changes externally
   useEffect(() => {
     const d = parseISODate(value);
     if (d) setViewMonth(startOfMonth(clampToTodayOrAfter(d)));
   }, [value]);
 
-  // click outside closes
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -119,7 +111,6 @@ export default function DatePicker({
     return () => window.removeEventListener("mousedown", onDown);
   }, [open]);
 
-  // esc closes
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -131,7 +122,7 @@ export default function DatePicker({
 
   const monthLabel = useMemo(() => {
     const fmt = new Intl.DateTimeFormat(undefined, {
-      month: "long",
+      month: "short",
       year: "numeric",
     });
     return fmt.format(viewMonth);
@@ -140,9 +131,7 @@ export default function DatePicker({
   const days = useMemo(() => {
     const start = startOfMonth(viewMonth);
     const end = endOfMonth(viewMonth);
-
-    // monday-first grid (Mon=0 .. Sun=6)
-    const firstDow = (start.getDay() + 6) % 7;
+    const firstDow = (start.getDay() + 6) % 7; // Mon-first
 
     const cells: Array<{ date: Date; inMonth: boolean }> = [];
     for (let i = 0; i < firstDow; i++) {
@@ -172,34 +161,25 @@ export default function DatePicker({
     ...inputBase,
     cursor: "pointer",
     userSelect: "none",
+    display: "flex",
+    alignItems: "center",
   };
 
-  // UPDATED: open DOWN + compact + premium surface using your theme tokens
+  // MINIMAL + SMALL: opens UP, fixed narrow width, tiny grid
   const popStyle: React.CSSProperties = {
     position: "absolute",
     left: 0,
-    right: 0,
-
-    // open DOWN (prevents collisions in the modal)
-    top: "calc(100% + 8px)",
-    bottom: "auto",
-
-    borderRadius: 16,
+    bottom: "calc(100% + 8px)",
+    width: 280,
+    borderRadius: 14,
     border: `1px solid ${border}`,
-    background:
-      "radial-gradient(650px 280px at 50% 0%, rgba(248, 68, 0, 0.12), transparent 60%), linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.04))",
-    backdropFilter: "blur(12px)",
-    boxShadow:
-      "0 18px 50px rgba(0,0,0,0.6), 0 0 0 1px rgba(248,68,0,0.18)",
+    background: "rgba(0,0,0,0.86)",
+    backdropFilter: "blur(10px)",
+    boxShadow: "0 18px 50px rgba(0,0,0,0.60)",
     padding: 10,
     zIndex: 50,
-
-    // compact / safe sizing
-    maxWidth: 320,
-    margin: "0 auto",
   };
 
-  // UPDATED: smaller header buttons
   const headerBtn: React.CSSProperties = {
     height: 28,
     width: 28,
@@ -212,19 +192,7 @@ export default function DatePicker({
     lineHeight: 1,
   };
 
-  const quickBtn: React.CSSProperties = {
-    padding: "7px 10px",
-    borderRadius: 999,
-    border: `1px solid ${border}`,
-    background: "rgba(0,0,0,0.22)",
-    color: text,
-    cursor: "pointer",
-    fontWeight: 900,
-    fontSize: 12,
-  };
-
-  const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const tomorrow = useMemo(() => addDays(today, 1), [today]);
+  const dow = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
@@ -236,71 +204,20 @@ export default function DatePicker({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") setOpen((v) => !v);
         }}
-        style={{
-          ...inputStyle,
-          display: "flex",
-          alignItems: "center",
-          color: text,
-        }}
+        style={inputStyle}
         {...(focusHandlers || {})}
       >
         <span style={{ color: value ? text : muted }}>
           {value ? value : "Select date"}
         </span>
-
-        <span style={{ marginLeft: "auto", opacity: 0.75, display: "flex" }}>
+        <span style={{ marginLeft: "auto", opacity: 0.7, display: "flex" }}>
           <CalendarIcon color={text} />
         </span>
       </div>
 
       {open && (
         <div style={popStyle}>
-          {/* Quick picks */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-            <button
-              type="button"
-              style={{
-                ...quickBtn,
-                flex: 1,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04))",
-              }}
-              onClick={() => {
-                onChange(toISODate(today));
-                setOpen(false);
-              }}
-            >
-              Today
-            </button>
-
-            <button
-              type="button"
-              style={{
-                ...quickBtn,
-                flex: 1,
-                border: "1px solid rgba(255,255,255,0.12)",
-                background:
-                  "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04))",
-              }}
-              onClick={() => {
-                onChange(toISODate(tomorrow));
-                setOpen(false);
-              }}
-            >
-              Tomorrow
-            </button>
-          </div>
-
-          {/* Month header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 8,
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <button
               type="button"
               style={headerBtn}
@@ -310,16 +227,7 @@ export default function DatePicker({
               ‹
             </button>
 
-            <div
-              style={{
-                flex: 1,
-                textAlign: "center",
-                color: text,
-                fontSize: 12.5,
-                fontWeight: 900,
-                letterSpacing: 0.2,
-              }}
-            >
+            <div style={{ flex: 1, textAlign: "center", color: text, fontSize: 12, fontWeight: 900 }}>
               {monthLabel}
             </div>
 
@@ -333,38 +241,15 @@ export default function DatePicker({
             </button>
           </div>
 
-          {/* DOW */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 5,
-              marginBottom: 6,
-            }}
-          >
-            {dow.map((d) => (
-              <div
-                key={d}
-                style={{
-                  color: muted,
-                  fontSize: 11,
-                  textAlign: "center",
-                  opacity: 0.9,
-                }}
-              >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 6 }}>
+            {dow.map((d, i) => (
+              <div key={`${d}-${i}`} style={{ color: muted, fontSize: 10.5, textAlign: "center" }}>
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Days */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7, 1fr)",
-              gap: 5,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
             {days.map(({ date, inMonth }, idx) => {
               const disabled = date < today;
               const active = selected ? isSameDay(date, selected) : false;
@@ -380,25 +265,22 @@ export default function DatePicker({
                     setOpen(false);
                   }}
                   style={{
-                    height: 30,
+                    height: 28,
                     borderRadius: 10,
                     border: active
-                      ? "1px solid var(--ss-orange-ring)"
+                      ? "1px solid rgba(248,68,0,0.55)"
                       : `1px solid ${border}`,
                     background: active
-                      ? "linear-gradient(90deg, var(--ss-orange-soft), rgba(248,88,0,0.14))"
-                      : "linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04))",
+                      ? "linear-gradient(90deg, rgba(248,68,0,0.22), rgba(248,88,0,0.14))"
+                      : "rgba(255,255,255,0.06)",
                     color: disabled
                       ? "rgba(255,255,255,0.22)"
                       : inMonth
                       ? text
-                      : "rgba(255,255,255,0.45)",
+                      : "rgba(255,255,255,0.42)",
                     cursor: disabled ? "not-allowed" : "pointer",
                     fontWeight: active ? 900 : 800,
-                    fontSize: 12,
-                    boxShadow: active
-                      ? "0 10px 24px rgba(248,68,0,0.18)"
-                      : "none",
+                    fontSize: 11.5,
                   }}
                 >
                   {date.getDate()}
@@ -406,8 +288,6 @@ export default function DatePicker({
               );
             })}
           </div>
-
-          {/* Footer actions (removed big Close button for compact UX) */}
         </div>
       )}
     </div>
