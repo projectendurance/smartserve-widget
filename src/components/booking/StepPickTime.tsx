@@ -1,4 +1,4 @@
-
+// src/components/booking/steps/StepPickTime.tsx
 
 type Props = {
   time: string;
@@ -14,6 +14,17 @@ type Props = {
   muted: string;
 };
 
+function isClosedAllDay(availableTimes: string[]) {
+  // Backend closure behavior: API returns slots but all are available=false.
+  // Your widget currently passes only "availableTimes" (already filtered),
+  // so closures typically arrive here as an empty list.
+  // We treat "empty list" as "closed" for the widget UX.
+  //
+  // If you later pass raw slots, you can make this smarter by checking
+  // an `allUnavailable` boolean from the parent.
+  return Array.isArray(availableTimes) && availableTimes.length === 0;
+}
+
 export default function StepPickTime({
   time,
   setTime,
@@ -24,6 +35,8 @@ export default function StepPickTime({
   text,
   muted,
 }: Props) {
+  const closedAllDay = isClosedAllDay(availableTimes);
+
   return (
     <>
       <div
@@ -35,7 +48,9 @@ export default function StepPickTime({
           flexWrap: "wrap",
         }}
       >
-        <div style={{ fontSize: 12, color: muted }}>Pick an available time.</div>
+        <div style={{ fontSize: 12, color: muted }}>
+          {closedAllDay ? "This date is not taking bookings." : "Pick an available time."}
+        </div>
 
         <button
           onClick={onBack}
@@ -57,7 +72,26 @@ export default function StepPickTime({
         </button>
       </div>
 
-      {availableTimes.length ? (
+      {/* CLOSED ALL DAY */}
+      {closedAllDay ? (
+        <div
+          style={{
+            borderRadius: 14,
+            padding: "12px 12px",
+            border: "1px solid rgba(245,158,11,0.45)",
+            background: "rgba(245,158,11,0.10)",
+            color: text,
+            fontFamily: font,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 4 }}>
+            ⛔ Venue closed all day
+          </div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.78)" }}>
+            Please go back and choose another date.
+          </div>
+        </div>
+      ) : availableTimes.length ? (
         <div
           style={{
             display: "grid",
